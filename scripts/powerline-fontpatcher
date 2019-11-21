@@ -23,15 +23,10 @@ def get_argparser(ArgumentParser=argparse.ArgumentParser):
 		             'Requires FontForge with Python bindings. '
 		             'Stores the patched font as a new, renamed font file by default.')
 	)
-	parser.add_argument('--unpatched_fonts_dir', default='unpatched', help='directory in which font files to patch are stored')
+	parser.add_argument('--unpatched_fonts_dir', '-u', default='unpatched', help='directory in which font files to patch are stored')
 	parser.add_argument('--patched_fonts_dir', '-p', default='patched', help='directory in which patched fonts should be stored')
-	parser.add_argument('--rename','-r',
-	                    help='add " for Powerline" to the font name',
-	                    default=False, action='store_true', dest='rename_font')
-	parser.add_argument('--source-font', help='source symbol font', metavar='font',
-	                    dest='source_font',
-	                    default='{0}/../fonts/powerline-symbols.sfd'.format(sys.path[0]),
-	                    type=argparse.FileType('rb'))
+	parser.add_argument('--rename','-r', help='add " for Powerline" to the font name', default=False, action='store_true')
+	parser.add_argument('--source-font', help='source symbol font', default='fonts/PowerlineExtraSymbols.sfd')
 	return parser
 
 
@@ -65,19 +60,19 @@ def patch_one_font(source_font, target_font, patched_fonts_dir, rename_font=True
 	# fonts may need tuning after patching.
 	for cp in chain(range(0x00, 0x17f), range(0x2500, 0x2600)):
 	    try:
-		    bbox = target_font[cp].boundingBox()
+		bbox = target_font[cp].boundingBox()
 	    except TypeError:
-		    continue
+		continue
 	    if not target_font_width:
-		    target_font_width = target_font[cp].width
+		target_font_width = target_font[cp].width
 	    if bbox[0] < target_bb[0]:
-		    target_bb[0] = bbox[0]
+		target_bb[0] = bbox[0]
 	    if bbox[1] < target_bb[1]:
-		    target_bb[1] = bbox[1]
+		target_bb[1] = bbox[1]
 	    if bbox[2] > target_bb[2]:
-		    target_bb[2] = bbox[2]
+		target_bb[2] = bbox[2]
 	    if bbox[3] > target_bb[3]:
-		    target_bb[3] = bbox[3]
+		target_bb[3] = bbox[3]
 
 	# Find source and target size difference for scaling
 	x_ratio = (target_bb[2] - target_bb[0]) / (source_bb[2] - source_bb[0])
@@ -92,10 +87,9 @@ def patch_one_font(source_font, target_font, patched_fonts_dir, rename_font=True
 
 	# Create new glyphs from symbol font
 	for source_glyph in source_font.glyphs():
-	    if source_glyph == source_font['block']:
-		    # Skip the symbol font block glyph
-		    continue
-
+	    if source_glyph.encoding not in range(0xe0a0, 0xe0d4):
+		#print ("excluding", source_glyph.encoding)
+		continue
 	    # Select and copy symbol from its encoding point
 	    source_font.selection.select(source_glyph.encoding)
 	    source_font.copy()
@@ -131,18 +125,20 @@ def patch_one_font(source_font, target_font, patched_fonts_dir, rename_font=True
 
 
 def patch_fonts(source_file, unpatched_fonts_dir, patched_dir, rename_font=True):
-	source_font = fontforge.open(source_file.name)
 	if not os.path.exists('patched'):
 	    os.mkdir('patched')
 	if not os.path.isdir(unpatched_fonts_dir):
 	    print("Expected a directory containing unpatched fonts, {unpatched_fonts_dir} is an invalid directory")
 	    return 0
+	source_font = fontforge.open(source_file)
+	print("Source font - {}".format(source_font))
 	for _file in os.listdir(unpatched_fonts_dir):
 	    name, ext = os.path.splitext(_file)
 	    if ext not in ['.otf','.ttf']:
 		continue
 	    _file = os.path.join(unpatched_fonts_dir, _file)
 	    target_font = fontforge.open(_file)
+	    print("Patching {} ...".format(target_font))
 	    try:
 		patch_one_font(source_font, target_font, 'patched', rename_font)
 	    finally:
@@ -153,7 +149,7 @@ def patch_fonts(source_file, unpatched_fonts_dir, patched_dir, rename_font=True)
 
 def main(argv):
 	args = get_argparser().parse_args(argv)
-	return patch_fonts(args.source_font, args.unpatched_fonts_dir, args.patched_fonts_dir, args.rename_font)
+	return patch_fonts(args.source_font, args.unpatched_fonts_dir, args.patched_fonts_dir, args.rename)
 
 
 raise SystemExit(main(sys.argv[1:]))
